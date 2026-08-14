@@ -25,10 +25,10 @@ jobs:
 
       - name: Run external script
         run: |
-          if [ -f "Main.js" ]; then
-            node Main.js
+          if [ -f "main.js" ]; then
+            node main.js
           else
-            echo "No se encontró el archivo Main.js, omitiendo este paso."
+            echo "No se encontró el archivo main.js, omitiendo este paso."
           fi
 
       # Runs a set of commands using the runners shell
