@@ -1,0 +1,177 @@
+# .github/workflows/multi-trigger.yml
+
+name: Workflow con múltiples triggers
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths-ignore:
+      - "**/*.md"
+
+  issues:
+    types:
+      - opened
+      - edited
+      - closed
+      - reopened
+
+  issue_comment:
+    types:
+      - created
+      - edited
+      - deleted
+
+  workflow_dispatch:
+    inputs:
+      entorno:
+        description: "Entorno donde ejecutar el workflow"
+        required: true
+        default: "desarrollo"
+        type: choice
+        options:
+          - desarrollo
+          - pruebas
+          - produccion
+
+      ejecutar_pruebas:
+        description: "¿Ejecutar pruebas?"
+        required: false
+        default: true
+        type: boolean
+
+  schedule:
+    # Todos los días a las 06:00 UTC
+    - cron: "0 6 * * *"
+
+# Permisos mínimos para consultar el repositorio, issues y comentarios.
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  mostrar-contexto:
+    name: Mostrar información del evento
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Mostrar trigger
+        run: |
+          echo "Evento: ${{ github.event_name }}"
+          echo "Acción: ${{ github.event.action || 'no aplica' }}"
+          echo "Repositorio: ${{ github.repository }}"
+          echo "Actor: ${{ github.actor }}"
+          echo "Referencia: ${{ github.ref }}"
+
+      - name: Descargar repositorio
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+
+  manejar-push:
+    name: Procesar push
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mostrar información del push
+        run: |
+          echo "Branch: ${GITHUB_REF_NAME}"
+          echo "Commit: ${GITHUB_SHA}"
+          echo "Autor del push: ${{ github.actor }}"
+
+      - name: Construir y probar
+        run: |
+          echo "Aquí se ejecutaría el build..."
+          echo "Aquí se ejecutarían las pruebas..."
+
+  manejar-issue:
+    name: Procesar issue
+    if: github.event_name == 'issues'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Mostrar información del issue
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_ACTION: ${{ github.event.action }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+        run: |
+          echo "Acción: ${ISSUE_ACTION}"
+          echo "Issue: #${ISSUE_NUMBER}"
+          echo "Título: ${ISSUE_TITLE}"
+          echo "Autor: ${ISSUE_AUTHOR}"
+
+  manejar-comentario:
+    name: Procesar comentario
+    if: github.event_name == 'issue_comment'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Mostrar información del comentario
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          COMMENT_AUTHOR: ${{ github.event.comment.user.login }}
+          COMMENT_BODY: ${{ github.event.comment.body }}
+        run: |
+          echo "Issue o PR: #${ISSUE_NUMBER}"
+          echo "Autor: ${COMMENT_AUTHOR}"
+          echo "Comentario: ${COMMENT_BODY}"
+
+      - name: Detectar comando /deploy
+        if: >
+          github.event.action == 'created' &&
+          startsWith(github.event.comment.body, '/deploy')
+        run: |
+          echo "Se detectó el comando /deploy"
+          echo "Aquí se podría iniciar un despliegue."
+
+      - name: Indicar si es comentario de un Pull Request
+        if: github.event.issue.pull_request != null
+        run: |
+          echo "Este comentario pertenece a un Pull Request."
+
+  ejecucion-manual:
+    name: Ejecución manual
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mostrar parámetros
+        env:
+          ENTORNO: ${{ inputs.entorno }}
+          EJECUTAR_PRUEBAS: ${{ inputs.ejecutar_pruebas }}
+        run: |
+          echo "Entorno seleccionado: ${ENTORNO}"
+          echo "Ejecutar pruebas: ${EJECUTAR_PRUEBAS}"
+
+      - name: Ejecutar pruebas
+        if: inputs.ejecutar_pruebas
+        run: |
+          echo "Ejecutando pruebas..."
+
+      - name: Ejecutar despliegue manual
+        env:
+          ENTORNO: ${{ inputs.entorno }}
+        run: |
+          echo "Desplegando en ${ENTORNO}..."
+
+  ejecucion-programada:
+    name: Ejecución programada
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ejecutar tarea programada
+        run: |
+          echo "Ejecución iniciada mediante cron."
+          echo "Fecha UTC: $(date -u)"
+          echo "Aquí se podrían ejecutar tareas de mantenimiento."
