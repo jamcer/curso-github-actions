@@ -1,4 +1,4 @@
-name: Run Main.js Script
+name: Aprendiendo GitHub Actions
 
 on:
   push:
